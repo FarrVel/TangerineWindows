@@ -1,0 +1,40 @@
+# GUI & sistem
+PySide6-Essentials>=6.6
+pywin32>=306
+
+# Pemrosesan dokumen
+PyMuPDF>=1.24
+pdf2docx>=0.5.8
+python-docx>=1.1
+mammoth>=1.6
+markdown>=3.5
+
+# Pemrosesan gambar
+Pillow>=11.3
+pillow-heif>=0.16
+
+# QR code (salah satu cukup; keduanya dipasang untuk akurasi terbaik)
+zxing-cpp>=2.2
+opencv-python-headless>=4.8
+
+# MarkItDown (dependensi dipasang terpisah oleh install.bat karena 'magika'
+# membutuhkan onnxruntime yang belum tersedia untuk semua versi Python)
+beautifulsoup4
+markdownify
+charset-normalizer
+defusedxml
+requests
+pdfminer.six
+pdfplumber
+openpyxl
+xlrd
+pandas
+python-pptx
+olefile
+lxml
+mutagen
+
+# Multimedia: YouTube downloader, ffmpeg lokal, runtime JS untuk yt-dlp
+yt-dlp[default]
+imageio-ffmpeg
+deno

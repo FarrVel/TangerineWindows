@@ -1,0 +1,39 @@
+# Python / Virtual Environment
+.venv/
+env/
+venv/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PyInstaller / Build
+build/
+dist/
+*.spec
+
+# User Data / Logs / Temp
+*.log
+tangerine.log
+*.tmp
+*.bak
+temp/
+tmp/
+
+# AppData Local Data & Whisper Engine/Models (Besar, di-download on demand)
+whisper/
+*.bin
+*.part
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# IDE / Editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
