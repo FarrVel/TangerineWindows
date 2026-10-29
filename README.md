@@ -1,7 +1,7 @@
 <div align="center">
 
 # 🍊 Tangerine for Windows
-**Alat Utilitas Konversi & Manipulasi File Cepat via Drag + SHIFT (Terinspirasi dari Tangerine di macOS)**
+**Utilitas Konversi & Manipulasi File Cepat via Drag + SHIFT (Terinspirasi dari Tangerine di macOS)**
 
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-orange.svg)](https://www.microsoft.com/windows)
@@ -13,44 +13,60 @@
 
 ---
 
-## ✨ Fitur Unggulan
+## 📋 Daftar Lengkap Fitur Berdasarkan Jenis File
+
+Berikut adalah matriks fungsionalitas dan menu yang tersedia di Tangerine for Windows:
+
+| Kategori File | Ekstensi yang Didukung | Opsi Konversi (Mode `KONVERSI`) | Alat Cepat (Mode `ALAT`) |
+| :--- | :--- | :--- | :--- |
+| **Dokumen PDF** | `.pdf` | • **DOCX** (ke Microsoft Word)<br>• **TXT** (ekstrak teks)<br>• **JPG / PNG** (tiap halaman jadi gambar)<br>• **EPUB** (buku digital)<br>• **MD** (MarkItDown komprehensif)<br>• **MERGE** (jika drag banyak PDF) | • **COMPRESS** (perkecil ukuran PDF)<br>• **METADATA** (bersihkan info penulis/edit)<br>• **QR** (scan semua QR code di lembar PDF)<br>• **ZIP** (arsipkan) |
+| **Dokumen Word** | `.docx` | • **PDF** (via Word/LibreOffice/Native)<br>• **TXT** (ekstrak teks polos)<br>• **HTML** (halaman web bersih)<br>• **EPUB** (e-book reader)<br>• **MD** (MarkItDown) | • **COMPRESS** (kompres gambar internal docx)<br>• **METADATA** (hapus info privasi & revisi)<br>• **ZIP** (arsipkan) |
+| **Excel & Spreadsheet** | `.xlsx`, `.xls`, `.csv` | • **MD** (ekstrak jadi tabel Markdown rapi)<br>• **PDF** *(khusus .csv)*<br>• **HTML** *(khusus .csv)* | • **COMPRESS** *(khusus xlsx)*<br>• **ZIP** (arsipkan) |
+| **PowerPoint** | `.pptx` | • **MD** (ekstrak teks & slide Markdown) | • **COMPRESS** (kompres media internal pptx)<br>• **ZIP** (arsipkan) |
+| **Gambar & Foto** | `.png`, `.jpg`, `.jpeg`, `.webp`, `.heic`, `.avif`, `.tiff`, `.bmp`, `.ico` | • **PNG / JPG / WEBP / BMP**<br>• **HEIC / AVIF / TIFF / ICO**<br>• **PDF** (satu gambar atau gabung banyak foto)<br>• **DOCX** (sematkan langsung ke Word) | • **COMPRESS** (kompresi cerdas tanpa pecah)<br>• **METADATA** (hapus EXIF, kamera, GPS)<br>• **QR** (deteksi & decode QR code ke clipboard)<br>• **OCR** (baca teks dalam gambar via Windows OCR)<br>• **ADD BG** (tambah warna latar belakang transparan)<br>• **CROP** (potong rasio bebas / 1:1 / 16:9)<br>• **REDACT** (sensor/pixelate/blok hitam)<br>• **ANNOTATE** (pena, panah, kotak, teks)<br>• **EDIT** (kecerahan, kontras, rotasi, grayscale) |
+| **Pesan Suara & Audio** | `.opus`, `.ogg` *(WhatsApp)*<br>`.m4a`, `.amr`, `.3gp` *(Perekam HP)*<br>`.mp3`, `.wav`, `.flac`, `.aac` | • **MP3** (audio standar universal 320k)<br>• **WAV** (lossless tanpa kompresi)<br>• **M4A** (format ringkas Apple/Android)<br>• **OGG** (format voice note)<br>• **TXT** (transkripsi ucapan speech-to-text)<br>• **MD** (metadata + transkripsi lengkap) | • **ENHANCE** (perjelas vokal, buang desis/noise, normalkan volume)<br>• **COMPRESS** (perkecil ukuran audio/suara)<br>• **TXT** (transkrip cepat ke clipboard)<br>• **ZIP** (arsipkan) |
+| **Video** | `.mp4`, `.mkv`, `.webm`, `.mov`, `.avi` | • **MP3** (ekstrak audio musik/suara)<br>• **MP4** (standardisasi ke H.264/AAC)<br>• **TXT** (transkripsi suara dalam video)<br>• **MD** (MarkItDown) | • **COMPRESS** (perkecil ukuran video)<br>• **TXT** (transkrip teks audio)<br>• **ZIP** (arsipkan) |
+| **Data & Web** | `.html`, `.json`, `.xml`, `.ipynb`, `.epub`, `.msg` *(Outlook)* | • **MD** (konversi struktur ke Markdown)<br>• **TXT / PDF / HTML** *(sesuai ekstensi)* | • **ZIP** (arsipkan) |
+| **Arsip ZIP** | `.zip` | • **EXTRACT** (ekstrak isi folder)<br>• **MD** (inspeksi & konversi seluruh isi zip) | • **ZIP** (rekursif) |
+| **Link YouTube / Web** | URL `youtube.com`, `youtu.be`, atau link web apapun | • **MP3** (unduh lagu kualitas 320 kbps + cover)<br>• **MP4** (unduh video hingga 1080p)<br>• **MD** (tarik transkrip subtitle YouTube / halaman web) | — |
+
+---
+
+## 🌟 Rincian Fitur Utama
 
 ### 1. 🎯 Gesture Pintar: Drag + SHIFT
-- **Zero Click Start**: Menampilkan Radial Menu modern tepat di posisi kursor saat file di-drag sambil menahan `SHIFT`.
-- **Aman 100%**: File asli tidak akan dipindah/dihapus (selalu diatur sebagai safe copy OLE).
-- **Auto-Dismiss**: Batal seketika saat kursor digerakkan menjauh atau menekan tombol `ESC`.
-- **Mode Toggle**: Tekan `CTRL` saat menu aktif untuk beralih mode antara **Konversi** dan **Alat Cepat**.
+- **Zero Click**: Menampilkan Radial Menu modern bergaya Windows 11 tepat di ujung kursor saat file di-drag sambil menahan `SHIFT`.
+- **Aman 100%**: File asli tidak pernah dipindah atau dihapus (selalu diatur sebagai safe copy OLE).
+- **Auto-Dismiss**: Menu otomatis menutup jika kursor bergerak menjauh, tidak ada aksi dalam 2.5 detik, atau menekan tombol `ESC`.
+- **Mode Toggle**: Tekan tombol `CTRL` saat menu aktif untuk berganti antara mode **Konversi** dan mode **Alat Cepat**.
 
-### 2. 📝 Integrasi Microsoft MarkItDown (Konversi Serba Markdown)
-Mengubah hampir semua file menjadi format `.md` terstruktur rapi (otomatis disalin ke clipboard):
-- **Dokumen Office**: Word (`.docx`), Excel (`.xlsx`, `.xls`), PowerPoint (`.pptx`).
-- **Dokumen Teks & Web**: PDF, HTML, CSV, JSON, XML, eBook (`.epub`), Outlook Email (`.msg`).
-- **Arsip**: ZIP (otomatis menguraikan dan membaca seluruh file di dalamnya).
-- **Gambar (OCR & EXIF)**: Ekstrak teks di dalam foto via Windows Native OCR Engine + metadata kamera & GPS.
-- **Audio (Speech-to-Text)**: Membaca metadata dan mentranskripsi ucapan menjadi teks.
+### 2. 📝 Integrasi Microsoft MarkItDown
+Mengubah dokumen apa saja menjadi Markdown bersih yang siap dimasukkan ke LLM (ChatGPT/Claude/Gemini):
+- Membaca tabel Excel & CSV menjadi format Markdown pipe `|`.
+- Menelusuri isi file `.zip` dan mengonversi seluruh dokumen di dalamnya secara otomatis.
+- Menarik transkrip video YouTube beserta ringkasan bab/timestamp video.
+- Hasil Markdown langsung tersimpan di folder asal dan otomatis disalin ke **clipboard**.
 
-### 3. 🎬 YouTube Downloader & Transkrip
-- Tarik tautan/URL YouTube dari browser + SHIFT, atau gunakan menu tray **YouTube / URL**:
-  - 🎵 **Unduh MP3**: Audio resolusi tinggi (320 kbps) lengkap dengan thumbnail cover & metadata.
-  - 🎥 **Unduh MP4**: Video MP4 hingga resolusi 1080p/terbaik.
-  - 📄 **Tarik Transkrip**: Mengambil teks subtitle/transkrip video menjadi file Markdown.
+### 3. 🎬 YouTube Downloader & Transcriber
+- Bisa digunakan lewat **drag URL** langsung dari address bar browser + SHIFT, atau via menu tray **YouTube / URL**:
+  - 🎵 **MP3**: Konversi ke audio 320 kbps jernih + metadata ID3 + cover album.
+  - 🎥 **MP4**: Unduh video dengan opsi resolusi (Terbaik, 1080p, 720p, 480p, 360p).
+  - 📄 **Transkrip**: Menarik teks ucapan di video YouTube langsung ke format Markdown.
 
-### 4. 🎙️ Konverter Pesan Suara (Voice Notes) & Audio
-- Konversi rekaman suara WhatsApp (`.opus`, `.ogg`) atau Voice Recorder ponsel (`.m4a`, `.amr`, `.wav`) ke format universal: **MP3, WAV, M4A, OGG**.
-- **Fitur ENHANCE**: Memperjelas vokal, membuang desis (noise reduction), dan menormalkan volume secara offline.
-- **Fitur COMPRESS**: Mengompres rekaman suara menjadi sangat ringan tanpa merusak kejernihan suara.
-- **Fitur Transkripsi Offline**: Mentranskripsi rekaman menjadi teks `.txt` menggunakan engine AI lokal (`whisper.cpp`).
+### 4. 🎙️ Pemrosesan Pesan Suara (Voice Notes)
+- Mengonversi voice note WhatsApp (`.opus`, `.ogg`) atau rekaman HP bawaan (`.m4a`, `.amr`) agar bisa diputar di PC maupun player mobil.
+- **Audio Enhance**: Menggunakan filter audio lanjutan (highpass, lowpass, FFT denoiser, dynaudnorm) untuk menjernihkan rekaman kuliah, rapat, atau voice note yang bising.
+- **Offline Speech-to-Text**: Mentranskripsi suara ucapan ke teks menggunakan AI `whisper.cpp` model multibahasa (termasuk Bahasa Indonesia) 100% offline.
 
-### 5. 🖼️ Image Toolkit & Editor Lengkap
-- **Konversi Gambar Cepat**: PNG, JPG, WEBP, HEIC (iPhone), AVIF, TIFF, BMP, PDF, DOCX, ICO.
-- **Editor Bawaan**: Crop (rasio bebas/1:1/16:9), Anotasi (Pena, Panah, Kotak, Teks), Redact (Sensor/Pixelate/Blok Hitam), Sesuaikan (Brightness, Contrast, Saturation).
-- **Hapus Metadata**: Menghilangkan data sensitif EXIF, lokasi GPS, dan model perangkat.
-- **QR Code Scanner**: Membaca QR code dari gambar atau PDF secara instan ke clipboard.
+### 5. 🖼️ Image Editor & OCR Bawaan
+- Membuka editor bawaan saat memilih menu **EDIT, ANNOTATE, CROP,** atau **REDACT**.
+- **OCR Offline**: Menggunakan API engine OCR Windows (`Windows.Media.Ocr`) untuk mengenali teks pada struk belanja, screenshot, dokumen scan, dan foto tanpa koneksi internet.
+- **Sanitasi Metadata**: Menghapus data rahasia seperti lokasi koordinat GPS kamera, nama pemilik, dan tipe perangkat pada foto.
 
-### 6. 🔄 Selalu Aktif & Auto-Restart (Supervisor Process)
+### 6. 🔄 Selalu Aktif di Latar Belakang (Persistent Background)
 - **Auto-Startup**: Otomatis mendaftarkan diri ke Windows Startup (`HKCU\...\Run`), langsung aktif saat laptop menyala.
-- **Crash Resilience**: Dilengkapi launcher supervisor yang otomatis membangkitkan aplikasi jika tertutup mendadak.
-- **Hemat Daya**: Menggunakan polling Win32 API ringan (~20ms) tanpa membebani CPU maupun baterai laptop.
+- **Supervisor Process**: Jika aplikasi crash atau ditutup tidak sengaja, supervisor otomatis menjalankannya kembali secara senyap.
+- **Hemat Resource**: Dirancang tanpa window utama yang berat, hanya polling API Windows ringan (~20ms) sehingga tidak memboroskan RAM maupun baterai.
 
 ---
 
@@ -87,7 +103,7 @@ python -m venv .venv
    - Tarik satu atau beberapa file dari File Explorer / Desktop.
    - Sambil men-drag, **tahan tombol SHIFT** → Menu radial muncul di posisi kursor.
    - Lepas file (drop) ke segmen yang diinginkan (misal: `DOCX`, `PNG`, `MP3`, `MD`).
-   - Hasil konversi langsung tersimpan di folder asal dengan suffix (contoh: `dokumen_converted.docx`).
+   - Hasil konversi langsung tersimpan di folder asal dengan akhiran nama (contoh: `dokumen_converted.docx`).
 2. **Ganti Menu Konversi ↔ Alat**:
    - Tekan tombol `CTRL` saat radial menu terbuka, atau tahan `CTRL + SHIFT` sejak awal drag.
 3. **Menu System Tray**:
