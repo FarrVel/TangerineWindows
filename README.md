@@ -63,10 +63,10 @@ Mengubah dokumen apa saja menjadi Markdown bersih yang siap dimasukkan ke LLM (C
 - **OCR Offline**: Menggunakan API engine OCR Windows (`Windows.Media.Ocr`) untuk mengenali teks pada struk belanja, screenshot, dokumen scan, dan foto tanpa koneksi internet.
 - **Sanitasi Metadata**: Menghapus data rahasia seperti lokasi koordinat GPS kamera, nama pemilik, dan tipe perangkat pada foto.
 
-### 6. 🔄 Selalu Aktif di Latar Belakang (Persistent Background)
-- **Auto-Startup**: Otomatis mendaftarkan diri ke Windows Startup (`HKCU\...\Run`), langsung aktif saat laptop menyala.
-- **Supervisor Process**: Jika aplikasi crash atau ditutup tidak sengaja, supervisor otomatis menjalankannya kembali secara senyap.
-- **Hemat Resource**: Dirancang tanpa window utama yang berat, hanya polling API Windows ringan (~20ms) sehingga tidak memboroskan RAM maupun baterai.
+### 6. 🔄 Selalu Aktif & Ultra Hemat RAM (< 15 MB di Latar Belakang)
+- **Arsitektur 2-Proses (Daemon + On-Demand Worker)**: Proses utama di System Tray hanya memantau gesture mouse tanpa memuat library berat. Semua konversi dokumen, AI transkripsi, OCR, dan YouTube dijalankan di subprocess `worker.py` terpisah yang langsung menutup diri setelah selesai — bebas *memory leak*.
+- **Auto Memory Trimming**: Menggunakan Win32 API `EmptyWorkingSet` secara otomatis saat idle sehingga pemakaian RAM di Task Manager tetap di bawah **10–15 MB**.
+- **Auto-Startup & Supervisor**: Otomatis mendaftarkan diri ke Windows Startup (`HKCU\...\Run`) dan dilengkapi supervisor yang otomatis menghidupkan ulang aplikasi jika tertutup mendadak.
 
 ---
 
