@@ -29,6 +29,19 @@ def log(msg):
         pass
 
 
+def _trim_self():
+    try:
+        import ctypes
+        from ctypes import wintypes
+        psapi = ctypes.WinDLL("psapi")
+        k32 = ctypes.WinDLL("kernel32")
+        k32.GetCurrentProcess.restype = wintypes.HANDLE
+        psapi.EmptyWorkingSet.argtypes = [wintypes.HANDLE]
+        psapi.EmptyWorkingSet(k32.GetCurrentProcess())
+    except Exception:
+        pass
+
+
 def main():
     exe = sys.executable
     args = [exe, os.path.abspath(__file__), "--child"] + [a for a in sys.argv[1:] if a != "--child"]
@@ -36,6 +49,7 @@ def main():
     while True:
         started = time.time()
         try:
+            _trim_self()
             code = subprocess.call(args, cwd=ROOT)
         except KeyboardInterrupt:
             return 0

@@ -126,7 +126,8 @@ tangerine-windows/
 │   ├── processors.py       # Core offline converters (Pillow, MuPDF, dll.)
 │   ├── radial_menu.py      # Antarmuka melingkar acrylic Windows 11
 │   ├── url_dialog.py       # Modal dialog pemrosesan URL/YouTube
-│   └── win_ocr.ps1         # Bridge PowerShell ke Windows.Media.Ocr
+│   ├── win_ocr.ps1         # Bridge PowerShell ke Windows.Media.Ocr
+│   └── worker.py           # Subprocess worker on-demand (bebas memory leak)
 ├── install.bat             # Skrip instalasi 1-klik untuk pengguna
 ├── make_shortcut.ps1       # Generator shortcut Desktop & Start Menu
 ├── requirements.txt        # Daftar pustaka Python

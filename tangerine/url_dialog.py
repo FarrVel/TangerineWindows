@@ -8,9 +8,17 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (QComboBox, QDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton,
                                QVBoxLayout)
 
-from .editor import STYLE
 from .icons import logo_icon, logo_pixmap
 from .media import YOUTUBE_RE, download_dir
+
+STYLE = """
+QDialog, QWidget { background: #1e1e22; color: #e8e8ee; font-family: 'Segoe UI'; font-size: 10pt; }
+QPushButton { background: #2c2c33; border: 1px solid #3a3a44; border-radius: 7px; padding: 6px 10px; color: #e8e8ee; }
+QPushButton:hover { background: #383842; }
+QPushButton:disabled { color: #666; background: #26262b; }
+QComboBox { background: #2c2c33; border: 1px solid #3a3a44; border-radius: 6px; padding: 4px 8px; }
+QLabel#muted { color: #9a9aa6; }
+"""
 
 URL_RE = re.compile(r"https?://\S+", re.I)
 

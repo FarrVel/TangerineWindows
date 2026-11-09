@@ -4,21 +4,28 @@ Tangerine for Windows — aplikasi utama (system tray).
 Menghubungkan:
   hook.DragWatcher  -> mendeteksi drag file + SHIFT
   radial_menu       -> menu melingkar di posisi kursor (drop-target)
-  actions/processors-> pemrosesan offline di thread terpisah
-  editor            -> editor gambar interaktif
+  worker.py         -> SEMUA pemrosesan & editor berjalan di proses worker terpisah
+                       yang langsung keluar setelah selesai (Strategi B)
   QSystemTrayIcon   -> ikon tray + Windows toast notification
+
+Daemon ini sengaja tidak pernah memuat library konversi (PyMuPDF, pandas,
+yt-dlp, MarkItDown, Pillow, ...) sehingga pemakaian RAM saat idle tetap kecil.
 """
 from __future__ import annotations
 
+import ctypes
+import gc
 import json
 import os
 import subprocess
 import sys
+import tempfile
 import traceback
 import winreg
+from ctypes import wintypes
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QRunnable, Qt, QThreadPool, QTimer, Signal
+from PySide6.QtCore import QObject, QProcess, QProcessEnvironment, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QColor, QCursor, QGuiApplication
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import (QApplication, QColorDialog, QFileDialog, QMenu, QMessageBox,
@@ -28,12 +35,9 @@ from . import __version__
 from . import markitdown_conv as MD
 from . import media as M
 from .actions import Action
-from .editor import ImageEditor
 from .hook import DragWatcher
 from .icons import logo_icon
-from .processors import ProcessingError, Result
 from .radial_menu import RadialMenu
-from .url_dialog import UrlDialog
 
 APP_NAME = "Tangerine for Windows"
 APP_ID = "TangerineForWindows"
@@ -42,6 +46,7 @@ CONFIG_FILE = CONFIG_DIR / "settings.json"
 LOG_FILE = CONFIG_DIR / "tangerine.log"
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 EXIT_ALREADY_RUNNING = 3  # dikenali supervisor (run_tangerine.pyw): jangan restart
+ROOT_DIR = Path(__file__).resolve().parent.parent
 
 DEFAULTS = {"enabled": True, "any_app": False, "open_folder_on_click": True, "autostart": True}
 
@@ -56,58 +61,101 @@ def log(msg: str):
 
 
 # --------------------------------------------------------------------------- #
-#  Worker thread
+#  Manajemen memori
 # --------------------------------------------------------------------------- #
 
-class _Signals(QObject):
-    done = Signal(object, str, object)      # (job, judul aksi, Result)
-    failed = Signal(object, str, str)       # (job, judul aksi, pesan error)
-    progress = Signal(object, str)          # (job, teks progres)
+_psapi = ctypes.WinDLL("psapi")
+_k32 = ctypes.WinDLL("kernel32")
+_k32.GetCurrentProcess.restype = wintypes.HANDLE
+_psapi.EmptyWorkingSet.argtypes = [wintypes.HANDLE]
 
 
-class Job(QRunnable):
-    def __init__(self, action: Action, paths: list[str], kwargs: dict):
-        super().__init__()
-        self.action, self.paths, self.kwargs = action, paths, kwargs
-        self.signals = _Signals()
-        if action.progress:
-            self.kwargs = dict(kwargs, progress=lambda msg: self.signals.progress.emit(self, msg))
+def trim_memory():
+    """Bebaskan objek Python yang tidak terpakai lalu kembalikan halaman RAM yang
+    sedang tidak dipakai ke Windows (EmptyWorkingSet). Halaman akan dimuat ulang
+    otomatis saat dibutuhkan lagi."""
+    try:
+        gc.collect()
+        _psapi.EmptyWorkingSet(_k32.GetCurrentProcess())
+    except Exception:
+        pass
 
-    def run(self):
-        title = self.action.label
-        try:
-            if self.action.batch:
-                res = self.action.func(self.paths, **self.kwargs)
-            else:
-                res = Result()
-                msgs, clip = [], []
-                errors = []
-                for p in self.paths:
-                    try:
-                        r = self.action.func(p, **self.kwargs)
-                        res.outputs += r.outputs
-                        if r.message:
-                            msgs.append(r.message)
-                        if r.clipboard:
-                            clip.append(r.clipboard)
-                    except Exception as e:  # noqa: BLE001
-                        log(traceback.format_exc())
-                        errors.append(f"{p if p.startswith('http') else Path(p).name}: {e}")
-                if errors and not res.outputs and not msgs:
-                    raise ProcessingError("\n".join(errors))
-                if len(self.paths) == 1:
-                    res.message = msgs[0] if msgs else ""
-                else:
-                    res.message = f"{len(self.paths) - len(errors)} dari {len(self.paths)} file berhasil diproses."
-                    if errors:
-                        res.message += "\nGagal: " + "; ".join(errors)[:200]
-                res.clipboard = "\n".join(clip) if clip else None
-            self.signals.done.emit(self, title, res)
-        except ProcessingError as e:
-            self.signals.failed.emit(self, title, str(e))
-        except Exception as e:  # noqa: BLE001
-            log(traceback.format_exc())
-            self.signals.failed.emit(self, title, f"{type(e).__name__}: {e}")
+
+# --------------------------------------------------------------------------- #
+#  Worker process (Strategi B)
+# --------------------------------------------------------------------------- #
+
+def worker_python() -> str:
+    """Interpreter untuk worker: pythonw.exe (tanpa jendela konsol) bila ada."""
+    exe = Path(sys.executable)
+    pyw = exe.with_name("pythonw.exe")
+    return str(pyw if pyw.exists() else exe)
+
+
+class WorkerJob(QObject):
+    """Satu pekerjaan = satu proses `python -m tangerine.worker` yang keluar setelah selesai."""
+    progress = Signal(object, str)          # (job, teks)
+    done = Signal(object, dict)             # (job, hasil)
+    failed = Signal(object, str, str)       # (job, judul, pesan)
+    ended = Signal(object)                  # (job) proses sudah keluar
+
+    def __init__(self, action: Action, args: list[str], parent=None, quiet_exit: bool = False):
+        super().__init__(parent)
+        self.action = action
+        self.quiet_exit = quiet_exit        # editor: ditutup tanpa simpan bukan error
+        self._buf = b""
+        self._reported = False
+        self.proc = QProcess(self)
+        self.proc.setProgram(worker_python())
+        self.proc.setArguments(["-m", "tangerine.worker", *args])
+        self.proc.setWorkingDirectory(str(ROOT_DIR))
+        env = QProcessEnvironment.systemEnvironment()
+        env.insert("PYTHONIOENCODING", "utf-8")
+        env.insert("PYTHONUTF8", "1")
+        self.proc.setProcessEnvironment(env)
+        self.proc.readyReadStandardOutput.connect(self._read)
+        self.proc.finished.connect(self._finished)
+        self.proc.errorOccurred.connect(self._error)
+
+    def start(self):
+        self.proc.start()
+
+    def _read(self):
+        self._buf += bytes(self.proc.readAllStandardOutput())
+        while b"\n" in self._buf:
+            line, self._buf = self._buf.split(b"\n", 1)
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                msg = json.loads(line.decode("utf-8", "replace"))
+            except ValueError:
+                continue
+            kind = msg.get("type")
+            if kind == "progress":
+                self.progress.emit(self, msg.get("msg", ""))
+            elif kind == "done":
+                self._reported = True
+                self.done.emit(self, msg)
+            elif kind == "error":
+                self._reported = True
+                self.failed.emit(self, msg.get("title") or self.action.label, msg.get("message", ""))
+
+    def _finished(self, code, _status):
+        self._read()
+        if not self._reported and not (self.quiet_exit and code == 0):
+            err = bytes(self.proc.readAllStandardError()).decode("utf-8", "replace").strip()
+            if err:
+                log(err)
+            tail = err.splitlines()[-1] if err else f"proses worker berhenti (kode {code})"
+            self.failed.emit(self, self.action.label, tail[:250])
+        self.ended.emit(self)
+
+    def _error(self, err):
+        if err == QProcess.FailedToStart:
+            self._reported = True
+            self.failed.emit(self, self.action.label, "Proses worker gagal dijalankan.")
+            self.ended.emit(self)
 
 
 # --------------------------------------------------------------------------- #
@@ -119,10 +167,7 @@ class TangerineApp(QObject):
         super().__init__()
         self.app = app
         self.settings = self._load_settings()
-        self.pool = QThreadPool.globalInstance()
-        self.pool.setMaxThreadCount(max(2, min(4, os.cpu_count() or 2)))
-        self._jobs: set[Job] = set()
-        self._editors: list[ImageEditor] = []
+        self._jobs: set[WorkerJob] = set()
         self._last_output: str | None = None
         self._icon_on = logo_icon()
         self._icon_off = logo_icon(disabled=True)
@@ -144,6 +189,18 @@ class TangerineApp(QObject):
 
         self._build_tray()
         self._ensure_startup()
+
+        # rapikan memori saat idle: sesaat setelah start & berkala tiap 60 detik
+        self._trim_timer = QTimer(self)
+        self._trim_timer.setInterval(60_000)
+        self._trim_timer.timeout.connect(self._trim_if_idle)
+        self._trim_timer.start()
+        QTimer.singleShot(4000, self._trim_if_idle)
+
+    def _trim_if_idle(self):
+        if not self.menu.isVisible() and not QApplication.activePopupWidget() \
+                and not QApplication.activeModalWidget():
+            trim_memory()
 
     # ---------------- settings ----------------
     def _load_settings(self) -> dict:
@@ -326,6 +383,7 @@ class TangerineApp(QObject):
 
     # ---------------- YouTube / URL & transkripsi ----------------
     def open_url_dialog(self):
+        from .url_dialog import UrlDialog
         dlg = UrlDialog()
         dlg.chosen.connect(self._url_chosen)
         self._url_dialog = dlg
@@ -334,13 +392,13 @@ class TangerineApp(QObject):
         dlg.activateWindow()
 
     def _url_chosen(self, kind: str, url: str, quality: str):
-        from functools import partial
+        self._url_dialog = None
         if kind == "MD":
-            act = Action("url_md", "Transkrip", func=MD.url_to_markdown)
+            act = Action("dlg_md", "Transkrip")
+            self.run_action(act, [url])
         else:
-            act = Action(f"yt_{kind.lower()}", kind, func=partial(M.youtube_download, fmt=kind, quality=quality),
-                         progress=True)
-        self.run_action(act, [url])
+            act = Action(f"dlg_{kind.lower()}", kind, progress=True)
+            self.run_action(act, [url], {"quality": quality})
 
     def _refresh_whisper_action(self):
         if MD.whisper_ready():
@@ -358,8 +416,7 @@ class TangerineApp(QObject):
             "100% offline di laptop Anda. Lanjutkan?")
         if r != QMessageBox.Yes:
             return
-        act = Action("whisper_setup", "Persiapan transkripsi",
-                     func=lambda _x, progress=None: MD.setup_whisper(progress), progress=True)
+        act = Action("whisper_setup", "Persiapan transkripsi", progress=True)
         self.a_whisper.setEnabled(False)
         self.a_whisper.setText("Mengunduh mesin transkripsi…")
         self.run_action(act, ["setup"])
@@ -385,6 +442,7 @@ class TangerineApp(QObject):
     def _on_menu_dismissed(self):
         if self.menu.drag_mode:
             self.watcher.mark_dismissed()
+        QTimer.singleShot(3000, self._trim_if_idle)
 
     def pick_files(self, tools: bool):
         files, _ = QFileDialog.getOpenFileNames(None, "Pilih file — Tangerine", str(Path.home()),
@@ -421,77 +479,77 @@ class TangerineApp(QObject):
             "<p style='color:gray'>Berjalan 100% Offline | Hasil disimpan di folder asal</p>")
         box.exec()
 
-    # ---------------- eksekusi aksi ----------------
-    def run_action(self, action: Action, paths: list[str]):
+    # ---------------- eksekusi aksi (di proses worker) ----------------
+    def run_action(self, action: Action, paths: list[str], extra: dict | None = None):
         if not paths:
             return
         if action.editor_mode:
             self._open_editor(paths[0], action.editor_mode)
             return
-        kwargs = {}
+        kwargs = dict(extra or {})
         if action.prompt == "color":
             c = QColorDialog.getColor(QColor(255, 255, 255), None, "Pilih warna latar belakang")
             if not c.isValid():
                 return
-            kwargs["color"] = (c.red(), c.green(), c.blue())
+            kwargs["color"] = [c.red(), c.green(), c.blue()]
 
-        job = Job(action, paths, kwargs)
-        job.setAutoDelete(False)
-        # sambungkan ke method QObject (bukan lambda) agar slot dijalankan di UI thread
-        job.signals.done.connect(self._job_done)
-        job.signals.failed.connect(self._job_failed)
-        job.signals.progress.connect(self._job_progress)
-        self._jobs.add(job)
+        fd, job_file = tempfile.mkstemp(prefix="tangerine_job_", suffix=".json")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump({"action": action.key, "paths": paths, "kwargs": kwargs}, f, ensure_ascii=False)
+
+        job = WorkerJob(action, [job_file], self)
+        self._connect_job(job)
         what = "URL" if paths[0].startswith("http") else f"{len(paths)} file"
         self.tray.setToolTip(f"{APP_NAME}\nMemproses {what} ({action.label})…")
-        if action.progress or action.key in ("url_md", "markdown", "transcript", "img_ocr") \
+        if action.progress or action.key in ("url_md", "dlg_md", "markdown", "transcript", "img_ocr") \
                 or action.key.startswith(("vid_", "aud_")):
             # proses yang bisa lama: beri tahu bahwa pekerjaan sudah dimulai
             self.notify(f"⏳ {action.label} dimulai", "Berjalan di latar belakang. Anda akan diberi tahu "
                                                        "saat selesai.")
-        self.pool.start(job)
+        job.start()
 
-    def _job_progress(self, job: Job, msg: str):
+    def _connect_job(self, job: WorkerJob):
+        job.done.connect(self._job_done)
+        job.failed.connect(self._job_failed)
+        job.progress.connect(self._job_progress)
+        job.ended.connect(self._job_ended)
+        self._jobs.add(job)
+
+    def _job_progress(self, job: WorkerJob, msg: str):
         self.tray.setToolTip(f"{APP_NAME}\n{job.action.label}: {msg}"[:120])
 
-    def _job_finished(self, job: Job):
+    def _job_ended(self, job: WorkerJob):
         self._jobs.discard(job)
         if job.action.key == "whisper_setup":
             self._refresh_whisper_action()
         if not self._jobs:
             self.tray.setToolTip(f"{APP_NAME}\nTahan SHIFT saat men-drag file")
+        job.deleteLater()
+        QTimer.singleShot(2000, self._trim_if_idle)
 
-    def _job_done(self, job: Job, title: str, res: Result):
-        self._job_finished(job)
-        if res.clipboard:
-            QGuiApplication.clipboard().setText(res.clipboard)
-        if res.outputs:
-            self._last_output = res.outputs[0]
-        ok = bool(res.outputs) or bool(res.clipboard)
+    def _job_done(self, job: WorkerJob, res: dict):
+        title = res.get("title") or job.action.label
+        clip = res.get("clipboard")
+        outputs = res.get("outputs") or []
+        if clip:
+            QGuiApplication.clipboard().setText(clip)
+        if outputs:
+            self._last_output = outputs[0]
+        if job.action.editor_mode:
+            self.notify("✅ Gambar disimpan", res.get("message") or "")
+            return
+        ok = bool(outputs) or bool(clip)
         head = f"✅ {title} selesai" if ok else f"ℹ️ {title}"
-        self.notify(head, res.message or "Selesai.")
+        self.notify(head, res.get("message") or "Selesai.")
 
-    def _job_failed(self, job: Job, title: str, err: str):
-        self._job_finished(job)
-        self.notify(f"❌ {title} gagal", err[:250], error=True)
+    def _job_failed(self, job: WorkerJob, title: str, err: str):
+        self.notify(f"❌ {title} gagal", (err or "Terjadi kesalahan.")[:250], error=True)
 
     def _open_editor(self, path: str, mode: str):
-        try:
-            ed = ImageEditor(path, mode)
-        except Exception as e:  # noqa: BLE001
-            log(traceback.format_exc())
-            self.notify("❌ Tidak bisa membuka gambar", str(e), error=True)
-            return
-        ed.saved.connect(self._editor_saved)
-        ed.finished.connect(lambda _=0, e=ed: self._editors.remove(e) if e in self._editors else None)
-        self._editors.append(ed)
-        ed.show()
-        ed.raise_()
-        ed.activateWindow()
-
-    def _editor_saved(self, out: str):
-        self._last_output = out
-        self.notify("✅ Gambar disimpan", Path(out).name)
+        act = Action(f"editor_{mode}", "Editor", editor_mode=mode)
+        job = WorkerJob(act, ["--editor", path, mode], self, quiet_exit=True)
+        self._connect_job(job)
+        job.start()
 
     def quit(self):
         self.watcher.stop()
